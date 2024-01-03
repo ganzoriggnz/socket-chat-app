@@ -1,6 +1,6 @@
+import { Button } from "antd";
+import { useEffect, useState } from "react";
 import io from "socket.io-client";
-import { useState, useEffect } from "react";
-
 let socket;
 
 type Message = {
@@ -14,8 +14,17 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Array<Message>>([]);
 
+  const [joinedRoom, setJoinedRoom] = useState("");
+  const [roomCreateName, setRoomCreateName] = useState("");
+  const [allMessages, setAllMessages] = useState([]);
+  const [Allrooms, setAllrooms] = useState([]);
+  const [roomPlayers, setroomPlayers] = useState([]);
+
   useEffect(() => {
     socketInitializer();
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const socketInitializer = async () => {
@@ -30,6 +39,21 @@ export default function Home() {
         { author: msg.author, message: msg.message },
       ]);
       console.log(messages);
+    });
+
+    socket.on("receive-message", (data) => {
+      setAllMessages((pre) => [...pre, data]);
+    });
+
+    socket.on("getrooms", (data) => {
+      console.log("getrooms:::", data);
+      setAllrooms(data);
+    });
+
+    socket.on("joinroom", (data) => {
+      console.log("joinroom:::", data);
+      setJoinedRoom(data["room_name"]);
+      setroomPlayers(data["players"]);
     });
   };
 
@@ -50,6 +74,34 @@ export default function Home() {
       }
     }
   };
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    console.log("emitted");
+    socket.emit("send-message", {
+      username,
+      message,
+    });
+    setMessage("");
+  }
+
+  function createSubmit(e) {
+    e.preventDefault();
+    socket.emit("createroom", {
+      room_name: roomCreateName,
+    });
+    setRoomCreateName("");
+  }
+
+  function joinroomSubmit(e) {
+    socket.emit("joinroom", e);
+  }
+
+  function leaveSubmit(e) {
+    socket.emit("leaveroom", {
+      room_name: e,
+    });
+  }
 
   return (
     <div className="flex items-center p-4 mx-auto min-h-screen justify-center bg-purple-500">
@@ -113,6 +165,61 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+            </div>
+            <div>
+              Create Room :{" "}
+              <form onSubmit={createSubmit}>
+                <input
+                  value={roomCreateName}
+                  onChange={(e) => setRoomCreateName(e.target.value)}
+                />
+              </form>
+            </div>
+            <div className="flex flex-col gap-2 w-[400px]">
+              <div className="flex w-full justify-between">
+                <p>Өрөөний нэр</p>
+                <p>Холбогдсон хүн</p>
+              </div>
+              {Allrooms.map(({ room_name, players }, index) => (
+                <div
+                  key={index}
+                  className="flex w-full justify-between items-center"
+                >
+                  <p>{room_name}</p>
+                  <p className="flex gap-2">
+                    ({players.length})
+                    <Button
+                      onClick={() => {
+                        joinroomSubmit({ room_name, players });
+                      }}
+                    >
+                      Join
+                    </Button>
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <h1 className="w-[500px] flex justify-between items-center gap-2">
+              <p>Joined Room :</p>
+              <p>{joinedRoom} </p>
+              {joinedRoom.length > 0 ? (
+                <Button
+                  onClick={() => {
+                    leaveSubmit(joinedRoom);
+                  }}
+                >
+                  leave
+                </Button>
+              ) : (
+                ""
+              )}
+            </h1>
+            <div>
+              {roomPlayers.length}
+              {roomPlayers.map((item, index) => (
+                <div key={index}>{item}</div>
+              ))}
             </div>
           </>
         )}
